@@ -9,6 +9,9 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 
+import androidx.core.content.ContextCompat;
+import androidx.palette.graphics.Palette;
+
 import org.acra.ACRA;
 import org.acra.annotation.AcraCore;
 import org.acra.annotation.AcraDialog;
@@ -21,6 +24,7 @@ import org.jellyfin.androidtv.base.BaseActivity;
 import org.jellyfin.androidtv.livetv.TvManager;
 import org.jellyfin.androidtv.model.DisplayPriorityType;
 import org.jellyfin.androidtv.model.LogonCredentials;
+import org.jellyfin.androidtv.model.repository.ConnectionManagerRepository;
 import org.jellyfin.androidtv.playback.ExternalPlayerActivity;
 import org.jellyfin.androidtv.playback.MediaManager;
 import org.jellyfin.androidtv.playback.PlaybackController;
@@ -32,25 +36,22 @@ import org.jellyfin.androidtv.preferences.enums.LoginBehavior;
 import org.jellyfin.androidtv.preferences.enums.PreferredVideoPlayer;
 import org.jellyfin.androidtv.search.SearchActivity;
 import org.jellyfin.androidtv.util.Utils;
+import org.jellyfin.apiclient.interaction.AndroidDevice;
 import org.jellyfin.apiclient.interaction.ApiClient;
 import org.jellyfin.apiclient.interaction.EmptyResponse;
 import org.jellyfin.apiclient.interaction.IConnectionManager;
 import org.jellyfin.apiclient.interaction.Response;
-import org.jellyfin.apiclient.interaction.VolleyHttpClient;
 import org.jellyfin.apiclient.logging.AndroidLogger;
 import org.jellyfin.apiclient.model.configuration.ServerConfiguration;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
 import org.jellyfin.apiclient.model.dto.BaseItemType;
 import org.jellyfin.apiclient.model.dto.UserDto;
 import org.jellyfin.apiclient.model.entities.DisplayPreferences;
-import org.jellyfin.apiclient.model.logging.ILogger;
-import org.jellyfin.apiclient.model.serialization.GsonJsonSerializer;
 
 import java.util.Calendar;
 import java.util.HashMap;
 
-import androidx.core.content.ContextCompat;
-import androidx.palette.graphics.Palette;
+import timber.log.Timber;
 
 @AcraCore(buildConfigClass = BuildConfig.class)
 @AcraHttpSender(
@@ -74,12 +75,7 @@ public class TvApp extends Application {
     public static final int LIVE_TV_SCHEDULE_OPTION_ID = 4000;
     public static final int LIVE_TV_SERIES_OPTION_ID = 5000;
 
-    private static final String TAG = "Jellyfin-AndroidTV";
-
-    private ILogger logger;
-    private IConnectionManager connectionManager;
     private PlaybackManager playbackManager;
-    private GsonJsonSerializer serializer;
     private static TvApp app;
     private UserDto currentUser;
     private BaseItemDto currentPlayingItem;
@@ -87,7 +83,6 @@ public class TvApp extends Application {
     private PlaybackController playbackController;
     private ApiClient loginApiClient;
     private AudioManager audioManager;
-    private VolleyHttpClient httpClient;
 
     private int autoBitrate;
     private String directItemId;
@@ -129,41 +124,27 @@ public class TvApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        logger = new AndroidLogger(TAG);
         app = (TvApp) getApplicationContext();
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        playbackManager = new PlaybackManager(new AndroidDevice(this), new AndroidLogger("PlaybackManager"));
         setCurrentBackgroundGradient(new int[] {ContextCompat.getColor(this, R.color.lb_default_brand_color_dark), ContextCompat.getColor(this, R.color.lb_default_brand_color)});
 
         registerActivityLifecycleCallbacks(new AuthenticatedUserCallbacks());
         registerActivityLifecycleCallbacks(new AppThemeCallbacks());
 
-        logger.Info("Application object created");
+        // Initialize the logging library
+        Timber.plant(new Timber.DebugTree());
+        Timber.i("Application object created");
     }
 
     public static TvApp getApplication() {
         return app;
     }
 
-    public ILogger getLogger() {
-        return logger;
-    }
-
-    public void setLogger(ILogger value) {
-        logger = value;
-    }
-
-    public IConnectionManager getConnectionManager() {
-        return connectionManager;
-    }
-
-    public void setConnectionManager(IConnectionManager connectionManager) {
-        this.connectionManager = connectionManager;
-    }
-
     public UserDto getCurrentUser() {
-        if (currentUser == null)
-            logger.Error("Called getCurrentUser() but value was null.");
-
+        if (currentUser == null) {
+            Timber.e("Called getCurrentUser() but value was null.");
+        }
         return currentUser;
     }
 
@@ -173,15 +154,8 @@ public class TvApp extends Application {
         this.displayPrefsCache = new HashMap<>();
     }
 
-    public GsonJsonSerializer getSerializer() {
-        return serializer;
-    }
-
-    public void setSerializer(GsonJsonSerializer serializer) {
-        this.serializer = serializer;
-    }
-
     public ApiClient getApiClient() {
+        IConnectionManager connectionManager = ConnectionManagerRepository.Companion.getInstance(this).getConnectionManager();
         return currentUser != null ? connectionManager.GetApiClient(currentUser) : null;
     }
 
@@ -226,18 +200,6 @@ public class TvApp extends Application {
         intent.putExtra("MusicOnly", musicOnly);
 
         activity.startActivity(intent);
-    }
-
-    public void showMessage(String title, String msg) {
-        if (currentActivity != null) {
-            currentActivity.showMessage(title, msg);
-        }
-    }
-
-    public void showMessage(String title, String msg, int timeout, int iconResource) {
-        if (currentActivity != null) {
-            currentActivity.showMessage(title, msg, timeout, iconResource, null);
-        }
     }
 
     public LogonCredentials getConfiguredAutoCredentials() {
@@ -426,7 +388,7 @@ public class TvApp extends Application {
     public void updateDisplayPrefs(String app, DisplayPreferences preferences) {
         displayPrefsCache.put(preferences.getId(), preferences);
         getApiClient().UpdateDisplayPreferencesAsync(preferences, getCurrentUser().getId(), app, new EmptyResponse());
-        logger.Debug("Display prefs updated for %s isFavorite: %s", preferences.getId(), preferences.getCustomPrefs().get("FavoriteOnly"));
+        Timber.d("Display prefs updated for %s isFavorite: %s", preferences.getId(), preferences.getCustomPrefs().get("FavoriteOnly"));
     }
 
     public void getDisplayPrefsAsync(String key, Response<DisplayPreferences> response) {
@@ -435,7 +397,7 @@ public class TvApp extends Application {
 
     public void getDisplayPrefsAsync(final String key, String app, final Response<DisplayPreferences> outerResponse) {
         if (displayPrefsCache.containsKey(key)) {
-            logger.Debug("Display prefs loaded from cache %s", key);
+            Timber.d("Display prefs loaded from cache %s", key);
             outerResponse.onResponse(displayPrefsCache.get(key));
         } else {
             getApiClient().GetDisplayPreferencesAsync(key, getCurrentUser().getId(), app, new Response<DisplayPreferences>(){
@@ -444,14 +406,14 @@ public class TvApp extends Application {
                     if (response.getSortBy() == null) response.setSortBy("SortName");
                     if (response.getCustomPrefs() == null) response.setCustomPrefs(new HashMap<String, String>());
                     displayPrefsCache.put(key, response);
-                    logger.Debug("Display prefs loaded and saved in cache %s", key);
+                    Timber.d("Display prefs loaded and saved in cache %s", key);
                     outerResponse.onResponse(response);
                 }
 
                 @Override
                 public void onError(Exception exception) {
                     //Continue with defaults
-                    logger.ErrorException("Unable to load display prefs ", exception);
+                    Timber.e(exception, "Unable to load display prefs ");
                     DisplayPreferences prefs = new DisplayPreferences();
                     prefs.setId(key);
                     prefs.setSortBy("SortName");
@@ -473,7 +435,7 @@ public class TvApp extends Application {
             @Override
             public void onResponse(Long response) {
                 autoBitrate = response.intValue();
-                logger.Info("Auto bitrate set to: %d", autoBitrate);
+                Timber.i("Auto bitrate set to: %d", autoBitrate);
             }
         });
     }
@@ -493,14 +455,6 @@ public class TvApp extends Application {
 
     public void setLastDeletedItemId(String lastDeletedItemId) {
         this.lastDeletedItemId = lastDeletedItemId;
-    }
-
-    public VolleyHttpClient getHttpClient() {
-        return httpClient;
-    }
-
-    public void setHttpClient(VolleyHttpClient httpClient) {
-        this.httpClient = httpClient;
     }
 
     public BaseItemDto getLastPlayedItem() {

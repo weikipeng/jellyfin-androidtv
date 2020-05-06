@@ -26,7 +26,6 @@ import com.squareup.picasso.Target;
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.base.BaseActivity;
-import org.jellyfin.androidtv.base.IKeyListener;
 import org.jellyfin.androidtv.imagehandling.PicassoBackgroundManagerTarget;
 import org.jellyfin.androidtv.itemhandling.BaseRowItem;
 import org.jellyfin.androidtv.itemhandling.ItemLauncher;
@@ -65,6 +64,8 @@ import java.util.Date;
 import java.util.List;
 
 import androidx.leanback.app.BackgroundManager;
+
+import timber.log.Timber;
 
 public class ItemListActivity extends BaseActivity {
 
@@ -153,41 +154,6 @@ public class ItemListActivity extends BaseActivity {
             }
         });
 
-        //Key listener
-        registerKeyListener(new IKeyListener() {
-            @Override
-            public boolean onKeyUp(int key, KeyEvent event) {
-                if (MediaManager.isPlayingAudio()) {
-                    switch (key) {
-                        case KeyEvent.KEYCODE_MEDIA_PAUSE:
-                        case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
-                            if (MediaManager.isPlayingAudio()) MediaManager.pauseAudio(); else MediaManager.resumeAudio();
-                            return true;
-                        case KeyEvent.KEYCODE_MEDIA_NEXT:
-                        case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
-                            MediaManager.nextAudioItem();
-                            return true;
-                        case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
-                        case KeyEvent.KEYCODE_MEDIA_REWIND:
-                            MediaManager.prevAudioItem();
-                            return true;
-                        case KeyEvent.KEYCODE_MENU:
-                            showMenu(mCurrentRow, false);
-                            return true;
-                        }
-                } else if (mCurrentRow != null){
-                    switch (key) {
-                        case KeyEvent.KEYCODE_MEDIA_PLAY:
-                        case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
-                        case KeyEvent.KEYCODE_MENU:
-                            showMenu(mCurrentRow, false);
-                            return true;
-                    }
-                }
-                return false;
-            }
-        });
-
         BackgroundManager backgroundManager = BackgroundManager.getInstance(this);
         backgroundManager.attach(getWindow());
         mBackgroundTarget = new PicassoBackgroundManagerTarget(backgroundManager);
@@ -195,6 +161,41 @@ public class ItemListActivity extends BaseActivity {
         mItemId = getIntent().getStringExtra("ItemId");
         loadItem(mItemId);
 
+    }
+
+
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (MediaManager.isPlayingAudio()) {
+            switch (keyCode) {
+                case KeyEvent.KEYCODE_MEDIA_PAUSE:
+                case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+                    if (MediaManager.isPlayingAudio()) MediaManager.pauseAudio();
+                    else MediaManager.resumeAudio();
+                    return true;
+                case KeyEvent.KEYCODE_MEDIA_NEXT:
+                case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
+                    MediaManager.nextAudioItem();
+                    return true;
+                case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+                case KeyEvent.KEYCODE_MEDIA_REWIND:
+                    MediaManager.prevAudioItem();
+                    return true;
+                case KeyEvent.KEYCODE_MENU:
+                    showMenu(mCurrentRow, false);
+                    return true;
+            }
+        } else if (mCurrentRow != null) {
+            switch (keyCode) {
+                case KeyEvent.KEYCODE_MEDIA_PLAY:
+                case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+                case KeyEvent.KEYCODE_MENU:
+                    showMenu(mCurrentRow, false);
+                    return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -255,7 +256,7 @@ public class ItemListActivity extends BaseActivity {
     private AudioEventListener mAudioEventListener = new AudioEventListener() {
         @Override
         public void onPlaybackStateChange(PlaybackController.PlaybackState newState, BaseItemDto currentItem) {
-            TvApp.getApplication().getLogger().Info("Got playback state change event %s for item %s", newState.toString(), currentItem != null ? currentItem.getName() : "<unknown>");
+            Timber.i("Got playback state change event %s for item %s", newState.toString(), currentItem != null ? currentItem.getName() : "<unknown>");
 
             if (newState != PlaybackController.PlaybackState.PLAYING || currentItem == null) {
                 if (mCurrentlyPlayingRow != null) mCurrentlyPlayingRow.updateCurrentTime(-1);
@@ -483,7 +484,7 @@ public class ItemListActivity extends BaseActivity {
 
         @Override
         public void onError(Exception exception) {
-            mApplication.getLogger().ErrorException("Error loading", exception);
+            Timber.e(exception, "Error loading");
             Utils.showToast(mActivity, exception.getLocalizedMessage());
         }
     };

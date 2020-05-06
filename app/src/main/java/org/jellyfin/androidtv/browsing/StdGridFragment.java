@@ -42,12 +42,14 @@ import org.jellyfin.androidtv.base.BaseActivity;
 import org.jellyfin.androidtv.base.CustomMessage;
 import org.jellyfin.androidtv.base.IKeyListener;
 import org.jellyfin.androidtv.base.IMessageListener;
+import org.jellyfin.androidtv.constants.Extras;
 import org.jellyfin.androidtv.itemhandling.BaseRowItem;
 import org.jellyfin.androidtv.itemhandling.ItemLauncher;
 import org.jellyfin.androidtv.itemhandling.ItemRowAdapter;
 import org.jellyfin.androidtv.model.FilterOptions;
 import org.jellyfin.androidtv.model.ImageType;
 import org.jellyfin.androidtv.model.PosterSize;
+import org.jellyfin.androidtv.model.repository.SerializerRepository;
 import org.jellyfin.androidtv.playback.MediaManager;
 import org.jellyfin.androidtv.presentation.CardPresenter;
 import org.jellyfin.androidtv.presentation.HorizontalGridPresenter;
@@ -76,6 +78,8 @@ import androidx.leanback.widget.OnItemViewSelectedListener;
 import androidx.leanback.widget.Presenter;
 import androidx.leanback.widget.Row;
 import androidx.leanback.widget.RowPresenter;
+
+import timber.log.Timber;
 
 public class StdGridFragment extends HorizontalGridFragment implements IGridLoader {
     private static final String TAG = "StdGridFragment";
@@ -115,7 +119,7 @@ public class StdGridFragment extends HorizontalGridFragment implements IGridLoad
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        mFolder = TvApp.getApplication().getSerializer().DeserializeFromString(getActivity().getIntent().getStringExtra("Folder"), BaseItemDto.class);
+        mFolder = SerializerRepository.INSTANCE.getSerializer().DeserializeFromString(getActivity().getIntent().getStringExtra(Extras.Folder), BaseItemDto.class);
         mParentId = mFolder.getId();
         MainTitle = mFolder.getName();
         mDisplayPrefs = TvApp.getApplication().getCachedDisplayPrefs(mFolder.getDisplayPreferencesId()); //These should have already been loaded
@@ -265,7 +269,7 @@ public class StdGridFragment extends HorizontalGridFragment implements IGridLoad
                         mCardHeight = autoHeight;
                         setNumberOfRows();
                         createGrid();
-                        TvApp.getApplication().getLogger().Debug("Auto card height is %d", mCardHeight);
+                        Timber.d("Auto card height is %d", mCardHeight);
                         buildAdapter(rowDef);
                     }
                     mGridAdapter.setSortBy(getSortOption(mDisplayPrefs.getSortBy()));
@@ -294,7 +298,7 @@ public class StdGridFragment extends HorizontalGridFragment implements IGridLoad
     }
 
     protected int getAutoCardHeight(Integer size) {
-        TvApp.getApplication().getLogger().Debug("Result size for auto card height is %d", size);
+        Timber.d("Result size for auto card height is %d", size);
         if (size > 35)
             return getCardHeight(PosterSize.SMALL);
         else if (size > 10)
@@ -592,7 +596,7 @@ public class StdGridFragment extends HorizontalGridFragment implements IGridLoad
         }
         if (mCurrentItem != null && mCurrentItem.getBaseItemType() != BaseItemType.Photo && mCurrentItem.getBaseItemType() != BaseItemType.PhotoAlbum
                 && mCurrentItem.getBaseItemType() != BaseItemType.MusicArtist && mCurrentItem.getBaseItemType() != BaseItemType.MusicAlbum) {
-            TvApp.getApplication().getLogger().Debug("Refresh item \"%s\"", mCurrentItem.getFullName());
+            Timber.d("Refresh item \"%s\"", mCurrentItem.getFullName());
             mCurrentItem.refresh(new EmptyResponse() {
                 @Override
                 public void onResponse() {

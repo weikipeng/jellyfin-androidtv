@@ -15,6 +15,7 @@ import org.jellyfin.androidtv.livetv.TvManager;
 import org.jellyfin.androidtv.model.ChangeTriggerType;
 import org.jellyfin.androidtv.model.ChapterItemInfo;
 import org.jellyfin.androidtv.model.FilterOptions;
+import org.jellyfin.androidtv.model.repository.ConnectionManagerRepository;
 import org.jellyfin.androidtv.playback.MediaManager;
 import org.jellyfin.androidtv.presentation.IPositionablePresenter;
 import org.jellyfin.androidtv.presentation.TextItemPresenter;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.TimeZone;
 
 import org.jellyfin.apiclient.interaction.EmptyResponse;
+import org.jellyfin.apiclient.interaction.IConnectionManager;
 import org.jellyfin.apiclient.interaction.Response;
 import org.jellyfin.apiclient.model.apiclient.ServerInfo;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
@@ -63,6 +65,8 @@ import org.jellyfin.apiclient.model.results.SeriesTimerInfoDtoResult;
 import org.jellyfin.apiclient.model.search.SearchHint;
 import org.jellyfin.apiclient.model.search.SearchHintResult;
 import org.jellyfin.apiclient.model.search.SearchQuery;
+
+import timber.log.Timber;
 
 public class ItemRowAdapter extends ArrayObjectAdapter {
     private ItemQuery mQuery;
@@ -507,12 +511,12 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
             return;
         }
         if (isCurrentlyRetrieving()) {
-            TvApp.getApplication().getLogger().Debug("Not loading more because currently retrieving");
+            Timber.d("Not loading more because currently retrieving");
             return;
         }
 
         if (pos >= itemsLoaded - 20) {
-            TvApp.getApplication().getLogger().Debug("Loading more items starting at %d", itemsLoaded);
+            Timber.d("Loading more items starting at %d", itemsLoaded);
             RetrieveNext();
         }
 
@@ -606,7 +610,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
         }
 
         if (retrieve) {
-            TvApp.getApplication().getLogger().Info("Re-retrieving row of type %s", queryType.toString());
+            Timber.i("Re-retrieving row of type %s", queryType.toString());
             Retrieve();
         }
 
@@ -722,7 +726,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving users", exception);
+                Timber.e(exception, "Error retrieving users");
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 removeRow();
                 currentlyRetrieving = false;
@@ -803,8 +807,9 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
     private void RetrieveViews() {
         final ItemRowAdapter adapter = this;
-        UserDto user = TvApp.getApplication().getCurrentUser();
-        TvApp.getApplication().getConnectionManager().GetApiClient(user).GetUserViews(user.getId(), new Response<ItemsResult>() {
+        final UserDto user = TvApp.getApplication().getCurrentUser();
+        final IConnectionManager connectionManager = ConnectionManagerRepository.Companion.getInstance(TvApp.getApplication()).getConnectionManager();
+        connectionManager.GetApiClient(user).GetUserViews(user.getId(), new Response<ItemsResult>() {
             @Override
             public void onResponse(ItemsResult response) {
                 if (response.getTotalRecordCount() > 0) {
@@ -834,7 +839,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving items", exception);
+                Timber.e(exception, "Error retrieving items");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -869,7 +874,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving search results", exception);
+                Timber.e(exception, "Error retrieving search results");
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
                 notifyRetrieveFinished();
@@ -942,7 +947,6 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
                     int prevItems = i == 0 && size() > 0 ? size() : 0;
                     for (BaseItemDto item : response.getItems()) {
                         add(new BaseRowItem(i++, item, getPreferParentThumb(), isStaticHeight()));
-                        //TvApp.getApplication().getLogger().Debug("Item Type: "+item.getType());
 
                     }
                     setItemsLoaded(i);
@@ -966,7 +970,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving items", exception);
+                Timber.e(exception, "Error retrieving items");
                 if (exception instanceof HttpException) {
                     HttpException httpException = (HttpException) exception;
                     if (httpException.getStatusCode() != null && httpException.getStatusCode() == 401 && "ParentalControl".equals(httpException.getHeaders().get("X-Application-Error-Code"))) {
@@ -1005,7 +1009,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
         //Add current video queue first if there
         clear();
         if (MediaManager.hasVideoQueueItems()) {
-            TvApp.getApplication().getLogger().Debug("Adding video queue...");
+            Timber.d("Adding video queue...");
             add(new BaseRowItem(new GridButton(TvApp.VIDEO_QUEUE_OPTION_ID, TvApp.getApplication().getString(R.string.lbl_current_queue), R.drawable.tile_port_video_queue)));
             itemsLoaded = 1;
         }
@@ -1022,7 +1026,6 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
                     int prevItems = i == 0 && size() > 0 ? size() : 0;
                     for (BaseItemDto item : response.getItems()) {
                         add(new BaseRowItem(i++, item, getPreferParentThumb(), isStaticHeight()));
-                        //TvApp.getApplication().getLogger().Debug("Item Type: "+item.getType());
                     }
                     setItemsLoaded(i);
                     if (i == 0) {
@@ -1055,7 +1058,6 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
                     int prevItems = i == 0 && size() > 0 ? size() : 0;
                     for (BaseItemDto item : response) {
                         add(new BaseRowItem(i++, item, getPreferParentThumb(), isStaticHeight()));
-                        //TvApp.getApplication().getLogger().Debug("Item Type: "+item.getType());
                     }
                     setItemsLoaded(i);
                     if (i == 0) {
@@ -1124,17 +1126,17 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
                                             }
                                         }
                                         if (existing == null) {
-                                            TvApp.getApplication().getLogger().Debug("Adding new episode 1 to premieres %s", item.getSeriesName());
+                                            Timber.d("Adding new episode 1 to premieres %s", item.getSeriesName());
                                             adapter.add(new BaseRowItem(i++, item, preferParentThumb, true));
 
                                         } else if (existing.getBaseItem().getParentIndexNumber() > item.getParentIndexNumber()) {
                                             //Replace the newer item with the earlier season
-                                            TvApp.getApplication().getLogger().Debug("Replacing newer episode 1 with an older season for %s", item.getSeriesName());
+                                            Timber.d("Replacing newer episode 1 with an older season for %s", item.getSeriesName());
                                             adapter.replace(existingPos, new BaseRowItem(i++, item, preferParentThumb, false));
                                         } // otherwise, just ignore this newer season premiere since we have the older one already
 
                                     } else {
-                                        TvApp.getApplication().getLogger().Info("Didn't add %s to premieres because different episode is in next up.", item.getSeriesName());
+                                        Timber.i("Didn't add %s to premieres because different episode is in next up.", item.getSeriesName());
                                     }
                                 }
                             }
@@ -1199,7 +1201,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
                                     @Override
                                     public void onError(Exception exception) {
-                                        TvApp.getApplication().getLogger().ErrorException("Unable to retrieve subsequent episodes in next up", exception);
+                                        Timber.e(exception, "Unable to retrieve subsequent episodes in next up");
                                         currentlyRetrieving = false;
                                     }
                                 });
@@ -1217,7 +1219,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving next up items", exception);
+                Timber.e(exception, "Error retrieving next up items");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1255,7 +1257,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving live tv channels", exception);
+                Timber.e(exception, "Error retrieving live tv channels");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1296,7 +1298,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving live tv programs", exception);
+                Timber.e(exception, "Error retrieving live tv programs");
                 removeRow();
                 //TODO suppress this message for now - put it back when server returns empty set for no live tv
                 //Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
@@ -1340,7 +1342,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving live tv recording groups", exception);
+                Timber.e(exception, "Error retrieving live tv recording groups");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1380,7 +1382,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving live tv series timers", exception);
+                Timber.e(exception, "Error retrieving live tv series timers");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1433,7 +1435,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving live tv recordings", exception);
+                Timber.e(exception, "Error retrieving live tv recordings");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1470,7 +1472,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving special features", exception);
+                Timber.e(exception, "Error retrieving special features");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1508,7 +1510,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving special features", exception);
+                Timber.e(exception, "Error retrieving special features");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1545,7 +1547,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving similar series items", exception);
+                Timber.e(exception, "Error retrieving similar series items");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1582,7 +1584,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving similar series items", exception);
+                Timber.e(exception, "Error retrieving similar series items");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1621,7 +1623,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving upcoming items", exception);
+                Timber.e(exception, "Error retrieving upcoming items");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1658,7 +1660,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving people", exception);
+                Timber.e(exception, "Error retrieving people");
                 removeRow();
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
@@ -1695,7 +1697,7 @@ public class ItemRowAdapter extends ArrayObjectAdapter {
 
             @Override
             public void onError(Exception exception) {
-                TvApp.getApplication().getLogger().ErrorException("Error retrieving season items", exception);
+                Timber.e(exception, "Error retrieving season items");
                 Utils.showToast(TvApp.getApplication(), exception.getLocalizedMessage());
                 currentlyRetrieving = false;
             }

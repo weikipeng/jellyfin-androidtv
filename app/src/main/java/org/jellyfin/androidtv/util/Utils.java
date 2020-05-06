@@ -20,6 +20,7 @@ import android.widget.Toast;
 import org.jellyfin.androidtv.BuildConfig;
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
+import org.jellyfin.androidtv.model.repository.SerializerRepository;
 import org.jellyfin.androidtv.preferences.enums.AudioBehavior;
 import org.jellyfin.androidtv.startup.DpadPwActivity;
 import org.jellyfin.androidtv.util.apiclient.AuthenticationHelper;
@@ -36,6 +37,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.UUID;
+
+import timber.log.Timber;
 
 /**
  * A collection of utility methods, all static.
@@ -202,10 +205,6 @@ public class Utils {
         return new PopupMenu(context, view, gravity);
     }
 
-    public static int getThemeColor(int resourceId) {
-        return getThemeColor(TvApp.getApplication().getCurrentActivity(), resourceId);
-    }
-
     public static int getThemeColor(Context context, int resourceId) {
         TypedArray styledAttributes = context.getTheme()
                 .obtainStyledAttributes(new int[]{resourceId});
@@ -215,14 +214,6 @@ public class Utils {
         return themeColor;
     }
 
-    public static int getBrandColor() {
-        return getThemeColor(android.R.attr.colorPrimary);
-    }
-
-    public static int getBrandColor(Context context) {
-        return getThemeColor(context, android.R.attr.colorPrimary);
-    }
-
     public static void processPasswordEntry(Activity activity, UserDto user) {
         processPasswordEntry(activity, user, null);
     }
@@ -230,12 +221,12 @@ public class Utils {
     public static void processPasswordEntry(final Activity activity, final UserDto user, final String directItemId) {
         if (TvApp.getApplication().getUserPreferences().getPasswordDPadEnabled()) {
             Intent pwIntent = new Intent(activity, DpadPwActivity.class);
-            pwIntent.putExtra("User", TvApp.getApplication().getSerializer().SerializeToString(user));
+            pwIntent.putExtra("User", SerializerRepository.INSTANCE.getSerializer().SerializeToString(user));
             pwIntent.putExtra("ItemId", directItemId);
             pwIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
             activity.startActivity(pwIntent);
         } else {
-            TvApp.getApplication().getLogger().Debug("Requesting dialog...");
+            Timber.d("Requesting dialog...");
             final EditText password = new EditText(activity);
             password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
             new AlertDialog.Builder(activity)
@@ -275,7 +266,7 @@ public class Utils {
     public static boolean downMixAudio() {
         AudioManager am = (AudioManager) TvApp.getApplication().getSystemService(Context.AUDIO_SERVICE);
         if (am.isBluetoothA2dpOn()) {
-            TvApp.getApplication().getLogger().Info("Downmixing audio due to wired headset");
+            Timber.i("Downmixing audio due to wired headset");
             return true;
         }
 

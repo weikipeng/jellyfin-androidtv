@@ -5,7 +5,6 @@ import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
-import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.TvApp
 import org.jellyfin.androidtv.base.BaseActivity
 
@@ -13,7 +12,6 @@ import org.jellyfin.androidtv.base.BaseActivity
  * PlaybackOverlayActivity for video playback that loads PlaybackOverlayFragment
  */
 class PlaybackOverlayActivity : BaseActivity() {
-	private var videoManager: VideoManager? = null
 	var keyListener: View.OnKeyListener? = null
 
 	public override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,18 +21,10 @@ class PlaybackOverlayActivity : BaseActivity() {
 		// Note: Should NOT be applied to the decorView as this introduces artifacts
 		window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
-		setContentView(R.layout.activity_playback_overlay)
-
-		if (TvApp.getApplication().playbackController != null) {
-			videoManager = VideoManager(this, findViewById(android.R.id.content))
-			TvApp.getApplication().playbackController.init(videoManager)
-		}
-	}
-
-	public override fun onDestroy() {
-		super.onDestroy()
-
-		videoManager?.destroy()
+		supportFragmentManager
+			.beginTransaction()
+			.replace(android.R.id.content, CustomPlaybackOverlayFragment())
+			.commit()
 	}
 
 	override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {

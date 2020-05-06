@@ -77,6 +77,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
@@ -88,6 +89,8 @@ import androidx.leanback.widget.OnItemViewClickedListener;
 import androidx.leanback.widget.Presenter;
 import androidx.leanback.widget.Row;
 import androidx.leanback.widget.RowPresenter;
+
+import timber.log.Timber;
 
 public class CustomPlaybackOverlayFragment extends Fragment implements IPlaybackOverlayFragment, ILiveTvGuide {
     ImageView mLogoImage;
@@ -154,6 +157,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
 
     int mCurrentDuration;
     private LeanbackOverlayFragment leanbackOverlayFragment;
+    private VideoManager videoManager = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -167,7 +171,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
 
         mAudioManager = (AudioManager) mApplication.getSystemService(Context.AUDIO_SERVICE);
         if (mAudioManager == null) {
-            mApplication.getLogger().Error("Unable to get audio manager");
+            Timber.e("Unable to get audio manager");
             Utils.showToast(getActivity(), R.string.msg_cannot_play_time);
             return;
         }
@@ -202,7 +206,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        ViewGroup root = (ViewGroup) inflater.inflate(R.layout.vlc_player_interface, container);
+        ViewGroup root = (ViewGroup) inflater.inflate(R.layout.vlc_player_interface, container, false);
 
         // inject the RowsSupportFragment in the popup container
         if (getChildFragmentManager().findFragmentById(R.id.rows_area) == null) {
@@ -233,12 +237,30 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
                 //and then manage our fade timer
                 if (mFadeEnabled) startFadeTimer();
 
-                TvApp.getApplication().getLogger().Debug("Got touch event.");
+                Timber.d("Got touch event.");
                 return false;
             }
         });
 
         return root;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        if (TvApp.getApplication().getPlaybackController() != null) {
+            videoManager = new VideoManager(mActivity, view);
+            TvApp.getApplication().getPlaybackController().init(videoManager);
+        }
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+
+        if (videoManager != null)
+            videoManager.destroy();
     }
 
     @Override
@@ -555,7 +577,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
     public void onResume() {
         super.onResume();
         if (mAudioManager.requestAudioFocus(mAudioFocusChanged, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            mApplication.getLogger().Error("Unable to get audio focus");
+            Timber.e("Unable to get audio focus");
             Utils.showToast(getActivity(), R.string.msg_cannot_play_time);
             return;
         }
@@ -594,7 +616,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
 
         // give back audio focus
         mAudioManager.abandonAudioFocus(mAudioFocusChanged);
-        mApplication.getLogger().Debug("Fragment pausing. IsFinishing: %b", mActivity.isFinishing());
+        Timber.d("Fragment pausing. IsFinishing: %b", mActivity.isFinishing());
         if (!mActivity.isFinishing()) mActivity.finish(); // user hit "home" we want to back out
     }
 
@@ -683,7 +705,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
 
         mCurrentDisplayChannelStartNdx = start;
         mCurrentDisplayChannelEndNdx = end - 1;
-        TvApp.getApplication().getLogger().Debug("*** Display channels pre-execute");
+        Timber.d("*** Display channels pre-execute");
         mGuideSpinner.setVisibility(View.VISIBLE);
 
         mChannels.removeAllViews();
@@ -693,7 +715,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
         TvManager.getProgramsAsync(mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx, mCurrentGuideStart, mCurrentGuideEnd, new EmptyResponse() {
             @Override
             public void onResponse() {
-                TvApp.getApplication().getLogger().Debug("*** Programs response");
+                Timber.d("*** Programs response");
                 if (mDisplayProgramsTask != null) mDisplayProgramsTask.cancel(true);
                 mDisplayProgramsTask = new DisplayProgramsTask();
                 mDisplayProgramsTask.execute(mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx);
@@ -709,7 +731,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
 
         @Override
         protected void onPreExecute() {
-            TvApp.getApplication().getLogger().Debug("*** Display programs pre-execute");
+            Timber.d("*** Display programs pre-execute");
             mChannels.removeAllViews();
             mProgramRows.removeAllViews();
             mFirstFocusChannelId = mPlaybackController.getCurrentlyPlayingItem().getId();
@@ -735,7 +757,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
 
             boolean first = true;
 
-            TvApp.getApplication().getLogger().Debug("*** About to iterate programs");
+            Timber.d("*** About to iterate programs");
             LinearLayout prevRow = null;
             for (int i = start; i <= end; i++) {
                 if (isCancelled()) return null;
@@ -778,7 +800,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
 
         @Override
         protected void onPostExecute(Void aVoid) {
-            TvApp.getApplication().getLogger().Debug("*** Display programs post execute");
+            Timber.d("*** Display programs post execute");
             if (mCurrentDisplayChannelEndNdx < mAllChannels.size() - 1) {
                 // Show a paging row for channels below
                 int pageDnEnd = mCurrentDisplayChannelEndNdx + PAGE_SIZE;
@@ -894,7 +916,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
 
                     @Override
                     public void onError(Exception exception) {
-                        TvApp.getApplication().getLogger().ErrorException("Unable to get program details", exception);
+                        Timber.e(exception, "Unable to get program details");
                         detailUpdateInternal();
                     }
                 });
@@ -1025,10 +1047,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements IPlayback
 
     private int getCurrentChapterIndex(BaseItemDto item, long pos) {
         int ndx = 0;
-        TvApp.getApplication().getLogger().Debug("*** looking for chapter at pos: %d", pos);
+        Timber.d("*** looking for chapter at pos: %d", pos);
         if (item.getChapters() != null) {
             for (ChapterInfoDto chapter : item.getChapters()) {
-                TvApp.getApplication().getLogger().Debug("*** chapter %d has pos: %d", ndx, chapter.getStartPositionTicks());
+                Timber.d("*** chapter %d has pos: %d", ndx, chapter.getStartPositionTicks());
                 if (chapter.getStartPositionTicks() > pos) return ndx - 1;
                 ndx++;
             }

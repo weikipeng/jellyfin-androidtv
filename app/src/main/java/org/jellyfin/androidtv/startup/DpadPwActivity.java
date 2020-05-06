@@ -12,12 +12,14 @@ import android.widget.TextView;
 
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
+import org.jellyfin.androidtv.model.repository.SerializerRepository;
 import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.androidtv.util.apiclient.AuthenticationHelper;
 import org.jellyfin.apiclient.model.dto.UserDto;
 
 import androidx.fragment.app.FragmentActivity;
 
+import timber.log.Timber;
 
 public class DpadPwActivity extends FragmentActivity {
 
@@ -43,7 +45,7 @@ public class DpadPwActivity extends FragmentActivity {
         title = (TextView)findViewById(R.id.dpad_pw_text);
         pwField = (TextView)findViewById(R.id.dpad_pw_display);
 
-        user = TvApp.getApplication().getSerializer().DeserializeFromString(getIntent().getStringExtra("User"), UserDto.class);
+        user = SerializerRepository.INSTANCE.getSerializer().DeserializeFromString(getIntent().getStringExtra("User"), UserDto.class);
         directItemId = getIntent().getStringExtra("ItemId");
 
         title.setText(title.getText() + " for "+ user.getName());
@@ -71,21 +73,21 @@ public class DpadPwActivity extends FragmentActivity {
             case KeyEvent.KEYCODE_9:
                 if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER && System.currentTimeMillis() - lastKeyDown > longPressSensitivity) {
                     if (processed) return true; //some controllers appear to double send the up on a long press
-                    TvApp.getApplication().getLogger().Debug("Password finished");
+                    Timber.d("Password finished");
                     Utils.makeTone(ToneGenerator.TONE_CDMA_ANSWER, 200);
                     processed = true;
                     AuthenticationHelper.loginUser(user.getName(), password, TvApp.getApplication().getLoginApiClient(), this, directItemId);
                     return true;
                 }
                 if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && System.currentTimeMillis() - lastKeyDown > longPressSensitivity) {
-                    TvApp.getApplication().getLogger().Debug("Password clear");
+                    Timber.d("Password clear");
                     password = "";
                     pwField.setText(password);
                     processed = false;
                     return true;
                 }
                 if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN && System.currentTimeMillis() - lastKeyDown > longPressSensitivity) {
-                    TvApp.getApplication().getLogger().Debug("Requesting dialog...");
+                    Timber.d("Requesting dialog...");
                     final EditText password = new EditText(this);
                     final Activity activity = this;
                     password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);

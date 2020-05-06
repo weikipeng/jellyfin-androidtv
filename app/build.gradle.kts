@@ -55,7 +55,7 @@ android {
 
 dependencies {
 	// Jellyfin
-	implementation("com.github.jellyfin.jellyfin-apiclient-java:android:master-SNAPSHOT")
+	implementation("com.github.jellyfin.jellyfin-apiclient-java:android:v0.6.0")
 
 	// Kotlin
 	implementation(kotlin("stdlib-jdk8"))
@@ -97,6 +97,9 @@ dependencies {
 	implementation("ch.acra:acra-http:$acraVersion")
 	implementation("ch.acra:acra-dialog:$acraVersion")
 	implementation("ch.acra:acra-limiter:$acraVersion")
+
+	// Logging
+	implementation("com.jakewharton.timber:timber:4.7.1")
 
 	// Testing
 	testImplementation("junit:junit:4.12")
